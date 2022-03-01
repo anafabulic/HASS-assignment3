@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <meta charset="UTF-8">
+    <title>Hello World</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src='https://unpkg.com/maplibre-gl@2.1.6/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@2.1.6/dist/maplibre-gl.css' rel='stylesheet' />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+
+</head>
+
+<body>
+
+<div id='map' style='width: 800px; height: 600px;'></div>
+
+<script>
+            
+    var map = new maplibregl.Map({
+        container: 'map',
+        center: [103.82, 1.35], // starting position [lng, lat]
+        style: 'https://api.maptiler.com/maps/openstreetmap/style.json?key=8DMULYCaNbHcFudoPlNN',
+        zoom: 10.25 // starting zoom
+    });
+
+    map.on('load', function() {
+        map.addLayer({
+            'id': 'sg_roads',
+            'type': 'symbol',
+            'source': 'json_pts',
+            'layout': {
+                'icon-image': 'pt_icon',
+                'icon-size': '0.5'
+            }
+        });
+    });
+
+    map.addSource('json_pts', {
+        type:'geojson',
+        data: '???'
+    });
+
+
+
+</script>
+
+</body>
+</html>

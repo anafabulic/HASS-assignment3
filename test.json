@@ -1,0 +1,49 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    103.83326933333333,
+                    1.3633163333333334
+                ]
+            },
+            "properties": {
+                "Service": "410W",
+                "Ordinal": 1,
+                "Timestamp": "1645543346"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    103.84956016666666,
+                    1.3505186666666666
+                ]
+            },
+            "properties": {
+                "Service": "410W",
+                "Ordinal": 2,
+                "Timestamp": "1645543346"
+            }
+        },
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    0.0,
+                    0.0
+                ]
+            },
+            "properties": {
+                "Service": "410W",
+                "Ordinal": 3
+            }
+        }
+    ]
+}

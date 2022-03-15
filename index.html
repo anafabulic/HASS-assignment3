@@ -75,14 +75,10 @@
 <p style="text-align: center;">
     <em>Source: </em><a href="https://data.gov.sg/dataset/resale-flat-prices" target="_blank">Resale Flat Prices - data.gov.sg</a>
 </p>
-<p>
-    (The legend takes a while to load; try hard-refreshing the page with Ctrl-F5.)
-</p>
+
 <div id="content">
     <svg id="map"></svg>
 </div>
-
-
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -214,7 +210,8 @@
         let {height, width} = document.getElementById("map").getBoundingClientRect();
         let svg = d3.select("svg")
             .attr("width", width)
-            .attr("height", height);
+            .attr("height", height)
+            .append("g");
         // set scale
         let projection = d3.geoMercator()
             .fitSize(

@@ -1,61 +1,308 @@
 <!DOCTYPE html>
 <html>
 <head>
-
     <meta charset="UTF-8">
-    <title>Hello World</title>
+    <title>Singapore's priciest flats</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <script src='https://unpkg.com/maplibre-gl@2.1.6/dist/maplibre-gl.js'></script>
-    <link href='https://unpkg.com/maplibre-gl@2.1.6/dist/maplibre-gl.css' rel='stylesheet' />
+    <link href="https://fonts.googleapis.com/css2?family=Inconsolata&family=Libre+Franklin:wght@600&display=swap" rel="stylesheet"> 
     <style>
         body {
+            /*Gruvbox-Light colors*/
+            --bg0: #fbf1c7;   --fg0: #282828;
+            --bg1: #ebdbb2;   --fg1: #3c3836;
+            --bg2: #d5c4a1;   --fg2: #504945;
+            --bg3: #bdae93;   --fg3: #665c54;
+            --bg4: #a89984;   --fg4: #7c6f64;
+            --red: #cc241d; --red_d: #9d0006;
+            --org: #d65d0e; --org_d: #af3a03;
+            --ylw: #d79921; --ylw_d: #b57614;
+            --grn: #98971a; --grn_d: #79740e;
+            --blu: #458588; --blu_d: #076678;
+            --prp: #b16286; --prp_d: #8f3f71;
+            --aqa: #689d6a; --aqa_d: #427b58;
+            --gry: #7c6f64; --gry_d: #928374;
+
             margin: 0;
             padding: 0;
+            background: var(--bg0);
+            color: var(--fg0);
+            font-family: 'Inconsolata', 'Courier New', monospace;
+            text-align: center;
+        }
+        h1 {
+            font-family: 'Libre Franklin';
+            font-weight: bold;
+        }
+        a:link {color: var(--org_d);text-decoration: none;}
+        a:visited {color: var(--red);}
+        a:hover {color: var(--org);}
+        /* map formatting */
+        #content{
+            margin: auto;
         }
         #map {
             position: absolute;
-            top: 0;
-            bottom: 0;
+            display: block;
             width: 100%;
+            height: 60%;
+            margin-top: 40px;
+            background: transparent;
+        }
+        /* todo: figure out responsive alignment for svg */
+        .basemap {
+            fill: var(--bg4);
+            stroke: var(--bg0);
+            stroke-width: 1.2px;
+        }
+        .sale_pt {
+            fill: orange;
+            fill-opacity: 0.4;
+            stroke: var(--bg0);
+            stroke-width: 0.5px;
+            stroke-opacity: 1;
+        }
+        .legend {
+            fill: transparent;
+            stroke: var(--fg1);
         }
     </style>
-
 </head>
 
 <body>
 
-<div id='map' style='width: 800px; height: 600px;'></div>
+<h1 style="text-align: center;">Where are Singapore's most expensive flats?</h1>
+<p style="text-align: center;"><span id="timestamp"></span></h3>
+<p style="text-align: center;">
+    <em>Source: </em><a href="https://data.gov.sg/dataset/resale-flat-prices" target="_blank">Resale Flat Prices - data.gov.sg</a>
+</p>
+<div id="content">
+    <svg id="map"></svg>
+</div>
 
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-            
-    var map = new maplibregl.Map({
-        container: 'map',
-        center: [103.82, 1.35], // starting position [lng, lat]
-        style: 'https://api.maptiler.com/maps/openstreetmap/style.json?key=8DMULYCaNbHcFudoPlNN',
-        zoom: 10.25 // starting zoom
-    });
+    let timestamp = "";
+    const monthNames = ["January", "February", "March", "April", "May", "June","July", "August", "September", "October", "November", "December"];
+    const d = new Date();
+    const datestring = monthNames[d.getMonth()] + " " + d.getFullYear();
+    timestamp += "Locations of the 100 most expensive resale flat transactions as of " + datestring;
+    $("#timestamp").append(timestamp);   
 
-    map.on('load', function() {
-        map.addLayer({
-            'id': 'sg_roads',
-            'type': 'symbol',
-            'source': 'json_pts',
-            'layout': {
-                'icon-image': 'pt_icon',
-                'icon-size': '0.5'
+    // fetching data from data.gov.sg endpoint
+    async function get_sales() {
+        // construct datestring, pad with zero
+        let currDate = new Date();
+        let year = currDate.getFullYear();
+        let month = currDate.getMonth() + 1;
+        if (month < 10) month = '0' + month;
+        // construct URI
+        let uri_head = 'https://data.gov.sg/api/action/datastore_search';
+        let resource_id = '?resource_id=f1765b54-a209-4718-8d38-a39237f502b3';
+        let datestring = '&q={\"month\":\"' + year + '-' + month + '\"}';
+        let limit = '&limit=100';
+        let sort = '&sort=resale_price%20desc';
+        let uri = uri_head + resource_id + datestring + limit + sort;
+        // make request
+        let response = await fetch(uri);
+        let data = await response.json();
+        return data;
+    };
+
+    // fetching geocoded coordinates from OneMap API
+    async function get_xy(addr, price) {
+        // construct URI
+        let uri_head = 'https://developers.onemap.sg/commonapi/search?searchVal=';
+        let uri_tail = '&returnGeom=Y&getAddrDetails=Y&pageNum=1';
+        let uri = uri_head + addr + uri_tail;
+        // make request
+        let response = await fetch(uri);
+        let geocode = await response.json();
+        result = {
+            addr: addr,
+            price: price,
+            lat: geocode['results'][0]['LATITUDE'],
+            long: geocode['results'][0]['LONGITUDE']
+        };
+        return result;
+    };
+
+    // fetching basemap from github repo
+    async function get_sg() {
+        let uri = 'https://raw.githubusercontent.com/anafabulic/HASS-assignment3/main/sg_plnarea_simple.geojson'
+        let response = await fetch(uri);
+        let data = await response.json();
+        return data
+    }
+
+    // draw basemap using d3-geo
+    function draw_sg(basemap) {
+        // rewind arrays clockwise
+        let basemap_r = basemap.features;
+        for (let i = 0; i < basemap_r.length; i++) {
+            if (basemap_r[i].geometry.type == "MultiPolygon") {
+                for (let j = 0; j < basemap_r[i].geometry.coordinates.length; j++) {
+                    basemap_r[i].geometry.coordinates[j][0].reverse();
+                }
+            } else {
+                basemap_r[i].geometry.coordinates[0].reverse();
             }
+        }; 
+        basemap.features = basemap_r;
+        // setup projection and map centre
+        let {height, width} = document.getElementById("map").getBoundingClientRect();
+        let svg = d3.select("svg")
+            .attr("viewBox", [0,0,width,height]);
+        // let sg_centre = [103.8,1.366667];
+        // let projection = d3.geoMercator()
+                // // magic numbers because the below code doesn't really work
+                // .scale(150000)
+                // .center(sg_centre)
+                // .translate([width/2.25,height/2.3]);
+        let projection = d3.geoMercator()
+            .fitSize(
+                [width,height],
+                basemap
+            );
+        let path = d3.geoPath().projection(projection);
+        // draw map
+        svg.append("g")
+            .selectAll("path")
+            .data(basemap.features)
+            .enter()
+            .append("path")
+            .attr("d", path)
+            .attr("class","basemap");
+        return(basemap);
+    }
+
+    function draw_pt(pt, pricerange, extent) {
+        // setup projection
+        let {height, width} = document.getElementById("map").getBoundingClientRect();
+        let svg = d3.select("svg")
+            .attr("width", width)
+            .attr("height", height);
+        let projection = d3.geoMercator()
+            .fitSize(
+                [width,height],
+                extent
+            );
+        let x = projection([pt.long, pt.lat])[0];
+        let y = projection([pt.long, pt.lat])[1];
+        let price = pt.price;
+        // set scale
+        let price_scale = d3.scaleLinear()
+            .domain([pricerange[1],pricerange[0]])
+            .range([5,50]);
+        // draw pts
+        svg.append("circle")
+            .attr("cx", x)
+            .attr("cy", y)
+            .transition()
+            .duration(900)
+            .attr("r", price_scale(price))
+            .attr("class", "sale_pt");
+    }
+
+    function draw_lgd(pricerange, extent) {
+        // setup projection
+        let {height, width} = document.getElementById("map").getBoundingClientRect();
+        let svg = d3.select("svg")
+            .attr("width", width)
+            .attr("height", height);
+        // set scale
+        let projection = d3.geoMercator()
+            .fitSize(
+                [width,height],
+                extent
+            );
+        let path = d3.geoPath().projection(projection);
+        let price_scale = d3.scaleLinear()
+            .domain([pricerange[1],pricerange[0]])
+            .range([6,25]);
+        let lgd = [
+            {
+                value: 1.7*1000000,
+                label: "$1.7 million"
+            },
+            {
+                value: 1.4*1000000,
+                label: "$1.4 million"
+            },
+            {
+                value: 1.1*1000000,
+                label: "$1.1 million"
+            },            {
+                value: 0.8*1000000,
+                label: "$0.8 million"
+            }
+        ];
+        let plot = path.bounds(extent);
+        console.log(plot[1][0]);
+        console.log(plot[1][1]);
+        let placement = "translate("+(plot[1][0]*8/9)+","+(plot[1][1]*7/9)+")";
+        console.log(placement);
+        console.log(path.bounds(extent));
+        svg.selectAll("circle")
+            .data(lgd)
+            .enter()    
+            .append("circle")
+            .attr("transform", placement)
+            .attr("cy", d => -price_scale(d.value))
+            .transition()
+            .duration(1000)
+            .attr("r", d => price_scale(d.value))
+            .attr("class", "legend");
+        svg.selectAll("text")
+            .data(lgd)
+            .enter()
+            .append("text")
+            .attr("transform", placement)
+            .attr("y", d => -2*price_scale(d.value))
+            .attr("font-style", "italic")
+            .attr("font-size","0.8em")
+            .text(d => d.label);
+    }
+
+    // do stuff
+    get_sales().then(data => {
+        let sales = data["result"]["records"];
+        // prepare addrs for geocoding
+        let addrs = [];
+        sales.forEach(function(item, index) {
+            item.addr = item["block"] + " " + item["street_name"];
+            addrs.push(item.addr);
+        });
+        // make request to OneMap API for top ten most expensive transactions
+        // return only the latitude and longitude and put it in pts[]
+        let pts = [];
+        let pricerange = [];
+        addrs.forEach(function(item, index) {
+            price = sales[index]['resale_price'];
+            pts[index] = get_xy(item,price);
+            // fetch upper and lower bound for price
+            if (index == 0) {
+                pricerange[0] = price;
+            } else if (index == sales.length-1) {
+                pricerange[1] = price;
+            };
+        });
+        // draw map
+        get_sg().then(basemap => {
+            let extent = draw_sg(basemap);
+            pts[1].then(pt => {
+                draw_lgd(pricerange, extent);
+            });
+            pts.forEach(function(item, index) {
+                item.then(pt => {
+                    draw_pt(pt, pricerange, extent);
+                });
+            });  
         });
     });
 
-    map.addSource('json_pts', {
-        type:'geojson',
-        data: '???'
-    });
-
-
-
 </script>
-
 </body>
 </html>

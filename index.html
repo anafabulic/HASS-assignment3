@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Singapore's Priciest Flats</title>
+    <title>Singapore's priciest flats</title>
     <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
     <link href="https://fonts.googleapis.com/css2?family=Inconsolata&family=Libre+Franklin:wght@600&display=swap" rel="stylesheet"> 
     <style>
@@ -44,38 +44,40 @@
             position: absolute;
             display: block;
             width: 100%;
-            height: 60%;
-            margin-top: 40px;
+            height: 50%;
+            margin-top: 30px;
             background: transparent;
         }
         /* todo: figure out responsive alignment for svg */
         .basemap {
             fill: var(--bg4);
-            fill-opacity: 0.8;
+            fill-opacity: 0.7;
             stroke: var(--bg0);
-            stroke-width: 1.2px;
+            stroke-width: 1px;
         }
         .sale_pt {
-            fill: orange;
-            fill-opacity: 0.3;
+            /* fill: orange; */
+            fill-opacity: 0.4;
             stroke: var(--bg0);
             stroke-width: 0.5px;
             stroke-opacity: 1;
         }
         .legend {
-            fill: transparent;
-            stroke: var(--fg1);
+            /* fill: transparent; */
+            fill-opacity: 0.5;
+            stroke: var(--fg0);
+            stroke-opacity: 0.5;
         }
     </style>
 </head>
 
 <body>
 
-<h1 style="text-align: center;">Where are Singapore's priciest flats?</h1>
-<p style="text-align: center;"><span id="timestamp"></span></h3>
+<h1 style="text-align: center;">Where are Singapore's most expensive flats?</h1>
 <p style="text-align: center;">
-    <em>Source: </em><a href="https://data.gov.sg/dataset/resale-flat-prices" target="_blank">Resale Flat Prices - data.gov.sg</a>
-</p>
+    <em>Sources: </em><a href="https://data.gov.sg/dataset/resale-flat-prices" target="_blank">Resale Flat Prices - data.gov.sg</a>
+</p><p style="text-align: center;"><span id="timestamp"></span></p>
+<p style="text-align: center;"><span id="addrstring"></span></p>
 
 <div id="content">
     <svg id="map"></svg>
@@ -84,20 +86,16 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script>
-    let timestamp = "";
-    const monthNames = ["January", "February", "March", "April", "May", "June","July", "August", "September", "October", "November", "December"];
-    const d = new Date();
-    const datestring = monthNames[d.getMonth()] + " " + d.getFullYear();
-    timestamp += "Locations of the 100 most expensive resale flat transactions as of " + datestring;
-    $("#timestamp").append(timestamp);   
 
     // fetching data from data.gov.sg endpoint
     async function get_sales() {
+
         // construct datestring, pad with zero
         let currDate = new Date();
         let year = currDate.getFullYear();
         let month = currDate.getMonth() + 1;
         if (month < 10) month = '0' + month;
+        
         // construct URI
         let uri_head = 'https://data.gov.sg/api/action/datastore_search';
         let resource_id = '?resource_id=f1765b54-a209-4718-8d38-a39237f502b3';
@@ -105,18 +103,22 @@
         let limit = '&limit=100';
         let sort = '&sort=resale_price%20desc';
         let uri = uri_head + resource_id + datestring + limit + sort;
+        
         // make request
         let response = await fetch(uri);
         let data = await response.json();
         return data;
+    
     };
 
     // fetching geocoded coordinates from OneMap API
     async function get_xy(addr, price) {
+    
         // construct URI
         let uri_head = 'https://developers.onemap.sg/commonapi/search?searchVal=';
         let uri_tail = '&returnGeom=Y&getAddrDetails=Y&pageNum=1';
         let uri = uri_head + addr + uri_tail;
+    
         // make request
         let response = await fetch(uri);
         let geocode = await response.json();
@@ -127,18 +129,22 @@
             long: geocode['results'][0]['LONGITUDE']
         };
         return result;
+    
     };
 
     // fetching basemap from github repo
     async function get_sg() {
+    
         let uri = 'https://raw.githubusercontent.com/anafabulic/HASS-assignment3/main/sg_plnarea_simple.geojson'
         let response = await fetch(uri);
         let data = await response.json();
         return data
+    
     }
 
     // draw basemap using d3-geo
     function draw_sg(basemap) {
+    
         // rewind arrays clockwise
         let basemap_r = basemap.features;
         for (let i = 0; i < basemap_r.length; i++) {
@@ -151,22 +157,18 @@
             }
         }; 
         basemap.features = basemap_r;
+    
         // setup projection and map centre
         let {height, width} = document.getElementById("map").getBoundingClientRect();
         let svg = d3.select("svg")
             .attr("viewBox", [0,0,width,height]);
-        // let sg_centre = [103.8,1.366667];
-        // let projection = d3.geoMercator()
-                // // magic numbers because the below code doesn't really work
-                // .scale(150000)
-                // .center(sg_centre)
-                // .translate([width/2.25,height/2.3]);
         let projection = d3.geoMercator()
             .fitSize(
                 [width,height],
                 basemap
             );
         let path = d3.geoPath().projection(projection);
+        
         // draw map
         svg.append("g")
             .selectAll("path")
@@ -176,9 +178,11 @@
             .attr("d", path)
             .attr("class","basemap");
         return(basemap);
+
     }
 
     function draw_pt(pt, pricerange, extent) {
+        
         // setup projection
         let {height, width} = document.getElementById("map").getBoundingClientRect();
         let svg = d3.select("svg")
@@ -192,28 +196,68 @@
         let x = projection([pt.long, pt.lat])[0];
         let y = projection([pt.long, pt.lat])[1];
         let price = pt.price;
+        let addr = pt.addr;
+        
         // set scale
         let price_scale = d3.scaleLinear()
             .domain([pricerange[1],pricerange[0]])
-            .range([5,50]);
-        // draw pts
+            .range([5,height/15]);
+        let color_scale = d3.scaleSequential()
+            .domain([pricerange[1],pricerange[0]])
+            .range(['yellow','orangered']);
+        
+            // draw pts
         svg.append("circle")
             .attr("cx", x)
             .attr("cy", y)
             .transition()
             .duration(900)
             .attr("r", price_scale(price))
+            .attr("fill", color_scale(price))
             .attr("class", "sale_pt");
+        
+        //todo: mouseover
     }
 
     function draw_lgd(pricerange, extent) {
+        
         // setup projection
         let {height, width} = document.getElementById("map").getBoundingClientRect();
         let svg = d3.select("svg")
             .attr("width", width)
             .attr("height", height)
             .append("g");
-        // set scale
+
+        // set legend
+        function set_lgd(n) {
+            let result = Math.floor(n/100000)/10;
+            if (Number.isInteger(result) == true) {
+                return result.toString() + ".0";
+            } else {
+                return result;
+            };
+        };
+        let min = parseInt(pricerange[1]);
+        let max = parseInt(pricerange[0]);
+        let lgd = [
+            {
+                value: max,
+                label: "$" + set_lgd(max) + " million"
+            },
+            {
+                value: min + ((max-min)*2/3),
+                label: "$" + set_lgd(min + ((max-min)*2/3)) + " million"
+            },
+            {
+                value: min + ((max-min)*1/3),
+                label: "$" + set_lgd(min + ((max-min)*1/3)) + " million"
+            },            {
+                value: min,
+                label: "$" + set_lgd(min) + " million"
+            }
+        ];
+
+        // set scale, projection, and coordinates
         let projection = d3.geoMercator()
             .fitSize(
                 [width,height],
@@ -222,30 +266,14 @@
         let path = d3.geoPath().projection(projection);
         let price_scale = d3.scaleLinear()
             .domain([pricerange[1],pricerange[0]])
-            .range([6,25]);
-        let lgd = [
-            {
-                value: 1.7*1000000,
-                label: "$1.7 million"
-            },
-            {
-                value: 1.4*1000000,
-                label: "$1.4 million"
-            },
-            {
-                value: 1.1*1000000,
-                label: "$1.1 million"
-            },            {
-                value: 0.8*1000000,
-                label: "$0.8 million"
-            }
-        ];
+            .range([5,height/15]);
+        let color_scale = d3.scaleSequential()
+            .domain([pricerange[1],pricerange[0]])
+            .range(['yellow','orangered']);
         let plot = path.bounds(extent);
-        console.log(plot[1][0]);
-        console.log(plot[1][1]);
         let placement = "translate("+(plot[1][0]*8/9)+","+(plot[1][1]*7/9)+")";
-        console.log(placement);
-        console.log(path.bounds(extent));
+        
+        // draw legend
         svg.selectAll("circle")
             .data(lgd)
             .enter()    
@@ -255,12 +283,16 @@
             .transition()
             .duration(1000)
             .attr("r", d => price_scale(d.value))
+            .attr("fill", d => color_scale(d.value))
             .attr("class", "legend");
         svg.selectAll("text")
             .data(lgd)
             .enter()
             .append("text")
             .attr("transform", placement)
+            .attr("x", "1em")
+            .transition()
+            .duration(1000)
             .attr("y", d => -2*price_scale(d.value))
             .attr("font-style", "italic")
             .attr("font-size","0.8em")
@@ -269,31 +301,56 @@
 
     // do stuff
     get_sales().then(data => {
+
         let sales = data["result"]["records"];
+        
         // prepare addrs for geocoding
         let addrs = [];
         sales.forEach(function(item, index) {
             item.addr = item["block"] + " " + item["street_name"];
             addrs.push(item.addr);
         });
+        
         // make request to OneMap API for top ten most expensive transactions
         // return only the latitude and longitude and put it in pts[]
         let pts = [];
         let pricerange = [];
+        let locs = [];
         addrs.forEach(function(item, index) {
             price = sales[index]['resale_price'];
-            pts[index] = get_xy(item,price);
+            pts[index] = get_xy(item, price);
             // fetch upper and lower bound for price
             if (index == 0) {
                 pricerange[0] = price;
+                locs[0] = sales[index].addr;
             } else if (index == sales.length-1) {
                 pricerange[1] = price;
+                locs[1] = sales[index].addr;
             };
         });
+    
+        // print timestamp
+        let timestamp = "";
+        const monthNames = ["January", "February", "March", "April", "May", "June","July", "August", "September", "October", "November", "December"];
+        const d = new Date();
+        const datestring = monthNames[d.getMonth()] + " " + d.getFullYear();
+        timestamp += "Visualising the 100 most expensive resale flat transactions as of ";
+        timestamp += datestring + ".";
+        $("#timestamp").append(timestamp);
+    
+        // print most expensive addresses
+        let addrstring = "";
+        addrstring += "This month's most expensive sale is located at ";
+        addrstring += locs[0];
+        addrstring += ". It was sold for $";
+        addrstring += parseInt(pricerange[0]).toLocaleString('en-US');
+        addrstring += "."
+        $("#addrstring").append(addrstring);
+        
         // draw map
         get_sg().then(basemap => {
             let extent = draw_sg(basemap);
-            pts[1].then(pt => {
+            pts[0].then(pt => {
                 draw_lgd(pricerange, extent);
             });
             pts.forEach(function(item, index) {
